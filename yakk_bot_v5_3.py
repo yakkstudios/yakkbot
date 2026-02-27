@@ -1,5 +1,16 @@
 # yakk_bot_v5_3.py
-# $YAKK Telegram Bot 😈💜  v5.2
+# $YAKK Telegram Bot 😈💜  v5.3
+#
+# v5.3 changes:
+#   1. _STAKE_MESSAGES + stake_reminder_variants rethemed to Peaky Blinders /
+#      mafia / sharp-suited underground trader aesthetic — same rewards, APR,
+#      links, WL eligibility, disclaimer; language completely overhauled.
+#   2. X_MAIN_ACCOUNTS_DEFAULT fixed to ["yakk", "yakkstudios", "yakkops2"]
+#      (lowercase, no @, matches existing parser). Comment updated accordingly.
+#   3. /ca command added — replies with $YAKK Solana CA + DexScreener link.
+#   4. /linktree command added — replies with the $YAKK empire link hub.
+#   5. /wlcheck command added — Gen III WL reminder with Peaky Blinders hype +
+#      StakePoint link. Added to /start and /help menu.
 #
 # v5.2 changes — X Feed Forwarder:
 #   - Polls configured X/Twitter accounts every 10 minutes via JobQueue
@@ -25,7 +36,7 @@
 #   GROUP_CHAT_ID       — negative integer, e.g. -1001234567890
 #   ADMIN_IDS           — comma-separated Telegram user IDs, e.g. 123456,789012
 #   X_BEARER_TOKEN      — Twitter/X API v2 Bearer Token (free read-only tier)
-#   X_MAIN_ACCOUNTS     — comma-separated handles, e.g. @YAKK,@YAKKStudios,@shyfts_
+#   X_MAIN_ACCOUNTS     — comma-separated handles (overrides default), e.g. @YAKK,@YAKKStudios,@yakkops2
 #
 # Twitter/X free tier notes:
 #   - Free tier allows ~500k tweet reads/month, 1 request per 15 min per endpoint.
@@ -74,11 +85,15 @@ ADMIN_IDS     = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.stri
 # $YAKK token on Solana
 YAKK_CA         = "aDDUr8puCnmW2AyzrCmkxktMiRnmBSQ4a8GGhjEpump"
 DEXSCREENER_URL = f"https://api.dexscreener.com/latest/dex/tokens/{YAKK_CA}"
+DEXSCREENER_TOKEN_URL = f"https://dexscreener.com/solana/{YAKK_CA}"
 
 # ── StakePoint / Staking Config ──────────────────
 STAKEPOINT_POOL_URL = "https://stakepoint.app/pool/cmlig86wa0000l704q75kx8i6"
 STAKEPOINT_SITE_URL = "https://yakkstudios.com/stakepoint"
 NFT_WL_MIN_STAKE    = 250_000  # minimum $YAKK staked for WL NFT mint eligibility
+
+# ── $YAKK Link Hub ────────────────────────────────
+YAKK_LINKTREE_URL = "https://linktr.ee/yakkcult"
 
 # Regulatory-safe disclaimer — appended to all APR/reward mentions
 STAKE_DISCLAIMER = (
@@ -106,14 +121,15 @@ COPYPASTA_MIN_LEN    = 20  # ignore messages shorter than this (reactions, "gm",
 # Twitter/X API v2 Bearer Token — free read-only tier
 X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN", "")
 
-# Comma-separated handles from .env, e.g. "@YAKK,@YAKKStudios,@shyfts_"
-# Parsed into a plain list of lowercase handles without @ for storage/lookups.
+# Comma-separated handles from .env override (e.g. "@YAKK,@YAKKStudios,@yakkops2").
+# If X_MAIN_ACCOUNTS is not set in .env, the hardcoded defaults below are used.
+# Parsed into lowercase handles without @ for internal storage/lookups.
 _raw_accounts = os.getenv("X_MAIN_ACCOUNTS", "")
-X_MAIN_ACCOUNTS_DEFAULT: list[str] = [
-    h.strip().lstrip("@").lower()
-    for h in _raw_accounts.split(",")
-    if h.strip()
-]
+X_MAIN_ACCOUNTS_DEFAULT: list[str] = (
+    [h.strip().lstrip("@").lower() for h in _raw_accounts.split(",") if h.strip()]
+    if _raw_accounts.strip()
+    else ["yakk", "yakkstudios", "yakkops2"]  # v5.3: updated default accounts
+)
 
 # JSON file that persists {handle: last_tweet_id_str} across restarts
 XFEED_STATE_FILE = Path("x_feeds_last.json")
@@ -284,48 +300,53 @@ RAID_TEMPLATES = [
     ),
 ]
 
-# ── Staking messages (rotating, same core info) ──
+# ── Staking messages (rotating) — v5.3: Peaky Blinders / mafia / underground
+#    trader aesthetic. Rewards, APR, WL eligibility, links, disclaimer unchanged.
 _STAKE_MESSAGES = [
     (
-        "🔒😈💜 LOCK IN THE MOUNTAIN 💜😈🔒\n\n"
-        "The $YAKK staking pool is LIVE on StakePoint (Solana).\n\n"
-        "🏆 What you get:\n"
-        "• $YAKK reflections dripping into your wallet passively\n"
-        "• $SPT reward tokens on top — double the drip\n"
-        "• Check current APR live on the site (it spikes hard 🔥)\n\n"
-        "🎖️ NFT STAKING — COMING SOON:\n"
-        "Gen III sharp-suited traders, Peaky Blinders crews & mafia dons incoming.\n"
-        "WL mint eligibility: Genesis or Gen II hold + min {min_stake:,} $YAKK staked.\n"
-        "Public access via StakePoint for exclusive perks & drops.\n\n"
-        "💰 Stake now → earn while you hold:\n"
+        "🎩😈💜 BY ORDER OF THE YAKK BROTHERHOOD 💜😈🎩\n\n"
+        "The $YAKK staking pool is LIVE. The den is open. The table is set.\n\n"
+        "🃏 What the house pays out:\n"
+        "• $YAKK reflections — passive drip into your wallet, sharp as a razor blade\n"
+        "• $SPT reward tokens on top — double the take, no questions asked\n"
+        "• Current APR? Check the site. It spikes hard when the herd moves. 🔥\n\n"
+        "🎖️ GEN III NFT STAKING — THE INNER CIRCLE:\n"
+        "Sharp-suited traders, Peaky Blinders crews & mafia dons incoming.\n"
+        "Razor-edged degens, underground bosses, flat-cap crypto lords.\n"
+        "WL seat at the table: Genesis hold + min {min_stake:,} $YAKK staked.\n"
+        "No seat for paper hands. The den has standards. 😈\n\n"
+        "💰 Lock in or be locked out:\n"
         "🔗 {pool}\n"
         "🌐 {site}\n\n"
         "{disclaimer}"
     ),
     (
-        "😈💎🏔️ DIAMOND HOOVES. PASSIVE DRIP. 🏔️💎😈\n\n"
-        "Why just hold $YAKK when the mountain can PAY you?\n\n"
+        "🚬💎🏔️ THE UNDERGROUND IS OPEN FOR BUSINESS 🏔️💎🚬\n\n"
+        "Why bleed on the streets when the mountain PAYs you from the back room?\n\n"
         "Stake on StakePoint → earn $YAKK reflections + $SPT rewards.\n"
-        "The pool is live. The APR is on the site. Go check it. 👀\n\n"
-        "🔮 NFT STAKING INCOMING:\n"
-        "Gen III collection drops are near — cyber overlords, mythic beasts, regal thrones.\n"
-        "Want WL access? Stack {min_stake:,}+ $YAKK in the pool and hold Genesis.\n"
-        "No stake, no throne. Simple math. 😈\n\n"
+        "The pool is live. The cigar smoke is thick. APR is on the board — go look. 👀\n\n"
+        "🔮 GEN III COLLECTION — THE SYNDICATE DROPS:\n"
+        "Gold-drip mafia dons, razor-blade flat-cap lords, cigar-lit trading floor bosses.\n"
+        "Old-money criminal elegance. Pink fur. Diamond hooves. High-stakes degen energy.\n"
+        "WL access: Stack {min_stake:,}+ $YAKK in the pool and hold Genesis.\n"
+        "No stake, no throne. No throne, no table. The syndicate doesn't negotiate. 😈\n\n"
         "🔗 Pool: {pool}\n"
         "🌐 Info: {site}\n\n"
         "{disclaimer}"
     ),
     (
-        "💜🔥 THE PINK CULT EARNS WHILE IT SLEEPS 🔥💜\n\n"
-        "Staking is live. Rewards are flowing.\n\n"
+        "💜🔥 THE CULT EARNS WHILE THE CITY SLEEPS 🔥💜\n\n"
+        "Sharp suits. Flat caps. Razor blades in the hatband. $YAKK in the wallet.\n"
+        "Staking is live. The back-room rewards are flowing.\n\n"
         "📊 $YAKK staking on StakePoint:\n"
-        "→ Earn $YAKK reflections (auto-compound that bag)\n"
-        "→ Earn $SPT tokens (bonus drip for the degens)\n"
-        "→ APR varies — check site for live rate\n\n"
-        "👑 NFT STAKING PERKS (soon™):\n"
-        "Gen III NFT collection incoming. WL mint = Genesis hold + {min_stake:,} $YAKK staked.\n"
-        "Public stakers get exclusive perks & early drops on StakePoint.\n"
-        "Stack now. Throne later. 🏔️\n\n"
+        "→ $YAKK reflections — passive, ruthless, automatic\n"
+        "→ $SPT tokens — bonus drip for those who found the den\n"
+        "→ APR varies — check site for the live rate before you sit down\n\n"
+        "👑 GEN III NFT STAKING PERKS (soon™):\n"
+        "The Gen III table is for lords only — Peaky Blinders crews, mafia crypto bosses,\n"
+        "razor-sharp underground traders in pink fur and gold drip.\n"
+        "WL mint: Genesis hold + {min_stake:,} $YAKK staked. Miss it and miss everything.\n"
+        "Stack now. Claim your seat. The mountain runs this city. 🏔️\n\n"
         "🔗 {pool}\n"
         "🌐 {site}\n\n"
         "{disclaimer}"
@@ -455,16 +476,19 @@ async def handle_new_chat_member(update: Update, context: ContextTypes.DEFAULT_T
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "😈 $YAKK Bot v5.2 is LIVE on the mountain. GET YAKKED. 😈\n\n"
+        "😈 $YAKK Bot v5.3 is LIVE on the mountain. GET YAKKED. 😈\n\n"
         "Commands:\n"
         "/raid [target] — coordinate a herd raid\n"
         "/done — log raid completion (+10 Raid XP)\n"
         "/leaderboard — top 10 raid warriors\n"
-        "/stake — staking pool info + NFT perks teaser\n"
+        "/stake — staking pool info + Gen III NFT perks\n"
         "/fact — drop a random yakk fact\n"
         "/meme — generate a yakk meme text\n"
         "/prompt — get a Midjourney art prompt\n"
         "/price — check $YAKK price\n"
+        "/ca — $YAKK contract address + DexScreener link\n"
+        "/linktree — the full $YAKK empire link hub\n"
+        "/wlcheck — Gen III WL eligibility reminder\n"
         "/roast [@user] — savage yakk-themed roast 😈\n"
         "/xfeeds — show followed X accounts + last post info\n"
         "/addxfeed @handle — [admin] follow a new X account\n"
@@ -525,7 +549,7 @@ async def cmd_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def cmd_stake(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """StakePoint pool info with NFT tease and disclaimer."""
+    """StakePoint pool info with Gen III NFT tease and disclaimer."""
     msg = random.choice(_STAKE_MESSAGES).format(
         pool=STAKEPOINT_POOL_URL,
         site=STAKEPOINT_SITE_URL,
@@ -602,6 +626,50 @@ async def cmd_roast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     roast = random.choice(ROAST_POOL)
     await update.message.reply_text(
         f"😈 YAKK ROAST — {target_name}, this one's for you:\n\n{roast}"
+    )
+
+
+# ── v5.3 NEW COMMANDS ─────────────────────────────────────────────────────────
+
+async def cmd_ca(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Reply with the $YAKK Solana contract address and DexScreener link."""
+    await update.message.reply_text(
+        "😈🏔️ $YAKK CONTRACT ADDRESS — the mountain doesn't rug.\n\n"
+        f"<code>{YAKK_CA}</code>\n\n"
+        f"🔗 DexScreener: {DEXSCREENER_TOKEN_URL}\n\n"
+        "Copy the CA. Check the chart. DYOR. GET YAKKED. 😈💜",
+        parse_mode="HTML",
+    )
+
+
+async def cmd_linktree(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Reply with the full $YAKK empire link hub."""
+    await update.message.reply_text(
+        "😈💜 THE $YAKK EMPIRE — enter at your own risk.\n\n"
+        "Everything you need. One place. No rugs.\n\n"
+        f"🌐 Link Hub: {YAKK_LINKTREE_URL}\n\n"
+        "Pink fur. Gold drip. Diamond hooves. The mountain is in there. 🏔️\n"
+        "GET YAKKED. 😈"
+    )
+
+
+async def cmd_wlcheck(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Gen III WL eligibility reminder with Peaky Blinders hype."""
+    await update.message.reply_text(
+        "🎩😈 GEN III WHITELIST — DO YOU QUALIFY?\n\n"
+        "The table is set. The den has rules. No paper hands allowed.\n\n"
+        "✅ WL ELIGIBILITY REQUIREMENTS:\n"
+        f"• Hold a Genesis $YAKK NFT\n"
+        f"• Stake minimum {NFT_WL_MIN_STAKE:,} $YAKK on StakePoint\n\n"
+        "🔍 Check your stake balance:\n"
+        f"🔗 {STAKEPOINT_POOL_URL}\n"
+        f"🌐 {STAKEPOINT_SITE_URL}\n\n"
+        "🚬 GEN III IS COMING:\n"
+        "Peaky Blinders crews. Razor-sharp traders. Mafia degen bosses. 😈\n"
+        "Flat-cap crypto lords. Old-money criminal elegance. Pink fur. Gold drip.\n"
+        "Underground trading dens on-chain. High-stakes poker energy.\n\n"
+        "Stack now or miss the table. The mountain doesn't hold seats. 🏔️\n\n"
+        "GET YAKKED. 😈💜"
     )
 
 
@@ -1029,43 +1097,45 @@ async def job_daily_meme_drop(context: CallbackContext) -> None:
 
 
 async def job_daily_stake_reminder(context: CallbackContext) -> None:
-    """12:00 PM UTC — rotating stake hype + pool link + disclaimer."""
+    """12:00 PM UTC — rotating Peaky Blinders / mafia stake hype (v5.3)."""
     if GROUP_CHAT_ID == 0:
         return
 
     stake_reminder_variants = [
         (
-            "🔒💜 MIDDAY STAKE CHECK 💜🔒\n\n"
-            "pink cult — are your $YAKK bags locked in?\n\n"
-            "Staking rewards are FLOWING right now 🌊\n"
-            "→ $YAKK reflections hitting wallets\n"
-            "→ $SPT dripping on top\n"
-            "→ APR fluctuates — check live on the site 👀\n\n"
-            "🔮 NFT staking drops incoming for the locked beasts.\n"
-            f"Get {NFT_WL_MIN_STAKE:,}+ staked now or miss the WL throne. 👑\n\n"
+            "🎩🔒 MIDDAY STAKE CHECK — THE DEN IS OPEN 🔒🎩\n\n"
+            "By order of the YAKK Brotherhood — are your bags locked in?\n\n"
+            "The back-room rewards are FLOWING right now 🌊\n"
+            "→ $YAKK reflections hitting wallets — silent, ruthless, automatic\n"
+            "→ $SPT dripping on top — double take for the inner circle\n"
+            "→ APR fluctuates — check live on the site before you sit down 👀\n\n"
+            "🔮 Gen III staking drops incoming. Flat-cap lords. Mafia dons.\n"
+            f"Get {NFT_WL_MIN_STAKE:,}+ staked now or miss your seat at the table. 👑\n\n"
             f"🔗 {STAKEPOINT_POOL_URL}\n"
             f"🌐 {STAKEPOINT_SITE_URL}\n\n"
             f"{STAKE_DISCLAIMER}"
         ),
         (
-            "😈🏔️ THE MOUNTAIN PAYS DIVIDENDS 🏔️😈\n\n"
-            "Every hour you're not staked is an hour the mountain didn't pay you.\n\n"
+            "🚬😈 THE MOUNTAIN RUNS THE UNDERGROUND 😈🚬\n\n"
+            "Every hour you're not staked is an hour the syndicate didn't pay you.\n\n"
             "Live now on StakePoint:\n"
-            "💰 $YAKK reflection rewards\n"
-            "💎 $SPT bonus drip\n"
-            "👑 NFT staking + WL perks incoming\n\n"
-            "Lock in. Earn. Ascend. 😈💜\n\n"
+            "💰 $YAKK reflection rewards — sharp as a razor blade\n"
+            "💎 $SPT bonus drip — old-money criminal elegance\n"
+            "👑 Gen III NFT staking + WL perks incoming for the locked lords\n\n"
+            "Lock in. Earn. Ascend the mountain. The den doesn't wait. 😈💜\n\n"
             f"🔗 {STAKEPOINT_POOL_URL}\n"
             f"🌐 {STAKEPOINT_SITE_URL}\n\n"
             f"{STAKE_DISCLAIMER}"
         ),
         (
-            "💜🔥 PASSIVE INCOME IS A PINK YAKK CONCEPT 🔥💜\n\n"
-            "You hold $YAKK. You stake $YAKK. $YAKK pays you. The cycle is complete.\n\n"
-            "Check current APR at StakePoint — it spikes. Hard. 🔥\n"
-            "NFT Gen III holders: staking perks + exclusive drops are coming for you.\n"
+            "💜🎩 THE CULT EARNS WHILE THE CITY SLEEPS 🎩💜\n\n"
+            "Sharp suits. Flat caps. Cigar smoke. $YAKK in the wallet. $SPT dripping.\n"
+            "You hold. You stake. $YAKK pays you. The cycle is as old as the mountain.\n\n"
+            "Check current APR at StakePoint — it spikes when the herd moves. Hard. 🔥\n"
+            "Gen III NFT holders incoming: razor-edged traders, Peaky Blinders crews,\n"
+            "mafia degen bosses with pink fur and gold drip. Staking perks for the locked.\n"
             f"WL mint requires {NFT_WL_MIN_STAKE:,}+ $YAKK staked + Genesis hold.\n\n"
-            "No stake = no throne. The yakk doesn't negotiate. 😈\n\n"
+            "No stake = no seat. No seat = no table. The mountain has standards. 😈\n\n"
             f"🔗 {STAKEPOINT_POOL_URL}\n"
             f"🌐 {STAKEPOINT_SITE_URL}\n\n"
             f"{STAKE_DISCLAIMER}"
@@ -1167,7 +1237,7 @@ def _add_xp(user, xp: int) -> None:
 def main() -> None:
     # Load X feed state from disk before anything else
     _xfeed_load_state()
-    # Seed any accounts from .env that aren't already in state
+    # Seed any accounts from .env / defaults that aren't already in state
     _xfeed_get_accounts()
 
     # Build app — JobQueue is enabled automatically when the [job-queue] extra is installed
@@ -1186,6 +1256,10 @@ def main() -> None:
     app.add_handler(CommandHandler("price",        cmd_price))
     app.add_handler(CommandHandler("yakk",         cmd_yakk))
     app.add_handler(CommandHandler("roast",        cmd_roast))
+    # v5.3 new commands
+    app.add_handler(CommandHandler("ca",           cmd_ca))
+    app.add_handler(CommandHandler("linktree",     cmd_linktree))
+    app.add_handler(CommandHandler("wlcheck",      cmd_wlcheck))
     # X Feed commands (v5.2)
     app.add_handler(CommandHandler("xfeeds",       cmd_xfeeds))
     app.add_handler(CommandHandler("addxfeed",     cmd_addxfeed))
@@ -1249,8 +1323,8 @@ def main() -> None:
             "Add X_BEARER_TOKEN to your .env to enable it."
         )
 
-    print("😈💜 $YAKK Bot v5.2 is running. Pink fur. Gold drip. Staking live. X feeds active. GET YAKKED. 😈🏔️")
-    logger.info("$YAKK Bot v5.2 started — GET YAKKED. 😈 JobQueue active, polling started.")
+    print("😈💜 $YAKK Bot v5.3 is running. Pink fur. Gold drip. Flat caps. No rugs. GET YAKKED. 😈🏔️")
+    logger.info("$YAKK Bot v5.3 started — GET YAKKED. 😈 JobQueue active, polling started.")
 
     app.run_polling(drop_pending_updates=True)
 
