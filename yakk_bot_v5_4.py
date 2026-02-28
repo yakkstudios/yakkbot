@@ -59,6 +59,7 @@ from pathlib import Path
 
 import aiohttp
 import tweepy
+from yakkai_bot import register_yakkai_handlers
 from dotenv import load_dotenv
 from telegram import Update, ChatPermissions, InputMediaPhoto
 from telegram.ext import (
@@ -1297,6 +1298,7 @@ def main() -> None:
     app = Application.builder().token(BOT_TOKEN).build()
 
     # ── Command handlers ──────────────────────────
+    register_yakkai_handlers(app)
     app.add_handler(CommandHandler("start",        cmd_start))
     app.add_handler(CommandHandler("help",         cmd_help))
     app.add_handler(CommandHandler("raid",         cmd_raid))
